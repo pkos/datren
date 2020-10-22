@@ -6,7 +6,9 @@ use Digest::CRC qw(crc64 crc32 crc16 crcccitt crc crc8 crcopenpgparmor);
 
 #init
 my $substringrename = "-rename";
+my $substringmove = "-move";
 my $renameall = "FALSE";
+my $movefiles = "FALSE";
 my $datfile = "";
 my $system = "";
 my $discdirectory = "";
@@ -22,13 +24,14 @@ my @alllinesout;
 #check command line
 foreach my $argument (@ARGV) {
   if ($argument =~ /\Q$substringh\E/) {
-    print "datren v0.5 - Utility to compare No-Intro or Redump dat files to the rom or disc collection\n";
+    print "datren v0.6 - Utility to compare No-Intro or Redump dat files to the rom or disc collection\n";
     print "              and rename the matching files (by crc) to the dat standard.\n";
   	print "\n";
 	print "with datren [ options ] [dat file ...] [directory ...] [system]\n";
 	print "\n";
 	print "Options:\n";
 	print "  -rename  rename files with matching dat entries otherwise just log\n";
+	print "  -move    move the renamed files to the ../renamed subdirectory\n";	
     print "\n";
 	print "Example:\n";
 	print '              datren -rename "D:/Atari - 2600.dat" "D:/Atari - 2600/Games" "Atari - 2600"' . "\n";
@@ -41,10 +44,13 @@ foreach my $argument (@ARGV) {
   if ($argument =~ /\Q$substringrename\E/) {
     $renameall = "TRUE";
   }
+  if ($argument =~ /\Q$substringmove\E/) {
+    $movefiles = "TRUE";
+  }
 }
 
 #set paths and system variables
-if (scalar(@ARGV) < 3 or scalar(@ARGV) > 4) {
+if (scalar(@ARGV) < 3 or scalar(@ARGV) > 5) {
   print "Invalid command line.. exit\n";
   print "use: datren -h\n";
   print "\n";
@@ -58,9 +64,8 @@ $discdirectory = $ARGV[-2];
 print "dat file: $datfile\n";
 print "system: $system\n";
 print "game directory: $discdirectory\n";
-my $tempstr;
-$tempstr = $renameall;
-print "rename files: " . $tempstr . "\n";
+print "rename files: " . $renameall . "\n";
+print "move files: " . $movefiles . "\n";
 
 #exit no parameters
 if ($datfile eq "" or $system eq "" or $discdirectory eq "") {
@@ -86,7 +91,7 @@ close (FILE);
 my $dirname = $discdirectory;
 opendir(DIR, $dirname) or die "Could not open $dirname\n";
 while (my $filename = readdir(DIR)) {
-  if (-d $filename) {
+  if (-d $dirname . "/" . $filename) {
     next;
   } else {
     push(@linesgames, $filename) unless $filename eq '.' or $filename eq '..';
@@ -97,6 +102,11 @@ while (my $filename = readdir(DIR)) {
   }
 }
 closedir(DIR);
+
+if ($movefiles eq "TRUE")
+{
+  unless(mkdir $discdirectory . "/renamed") {print "WARNING: Unable to create ../renamed directory or already exists.\n"};
+}
 
 my $romname = "";
 my $gamename = "";
@@ -185,8 +195,16 @@ OUTER: foreach my $gameline (@linesgames)
 		    
                   if ($renameall eq "TRUE")
                   {
-                     rename($discdirectory . "/" . $gameline, $discdirectory . "/" . $romname . $fileext) || die ("Cannot rename: $gameline");
-					 push(@alllinesout, ["RENAMED: ", "$gameline to $romname" . "$fileext"]);
+	                 if ($movefiles eq "TRUE")
+                     {
+                        rename($discdirectory . "/" . $gameline, $discdirectory . "/renamed/" . $romname . $fileext) || die ("Cannot rename: $gameline");
+                        push(@alllinesout, ["RENAMED & MOVED: ", "$gameline to $romname" . "$fileext"]);	 
+                     }
+                     elsif ($movefiles eq "FALSE")
+					 {
+                        rename($discdirectory . "/" . $gameline, $discdirectory . "/" . $romname . $fileext) || die ("Cannot rename: $gameline");
+                        push(@alllinesout, ["RENAMED: ", "$gameline to $romname" . "$fileext"]);
+                     }
                   }
                   next OUTER;
                }
@@ -203,7 +221,8 @@ print "\ntotal matches: $totalmatches of $totalnames\n";
 
 #open log file and print all sorted output
 open(LOG, ">", "$system.txt") or die "Could not open $system.txt\n";
-print LOG "rename: " . $tempstr . "\n";
+print LOG "rename files: " . $renameall . "\n";
+print LOG "move files: " . $movefiles . "\n";
 print LOG "total matches: $totalmatches of $totalnames\n";
 print LOG "---------------------------------------\n";
 my @sortedalllinesout = sort{$a->[1] cmp $b->[1]} @alllinesout;
