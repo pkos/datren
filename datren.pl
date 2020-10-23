@@ -13,8 +13,6 @@ my $datfile = "";
 my $system = "";
 my $discdirectory = "";
 my $substringh = "-h";
-my $bincue = "FALSE";
-my $datbincue = "FALSE";
 my @linesdat;
 my @linesgames;
 my @linesmatch;
@@ -24,7 +22,7 @@ my @alllinesout;
 #check command line
 foreach my $argument (@ARGV) {
   if ($argument =~ /\Q$substringh\E/) {
-    print "datren v0.6 - Utility to compare No-Intro or Redump dat files to the rom or disc collection\n";
+    print "datren v0.7 - Utility to compare No-Intro or Redump dat files to the rom or disc collection\n";
     print "              and rename the matching files (by crc) to the dat standard.\n";
   	print "\n";
 	print "with datren [ options ] [dat file ...] [directory ...] [system]\n";
@@ -79,12 +77,8 @@ if ($datfile eq "" or $system eq "" or $discdirectory eq "") {
 open(FILE, "<", $datfile) or die "Could not open $datfile\n";
 while (my $readline = <FILE>) {
    push(@linesdat, $readline);
-   if (index(lc $readline, ".cue") != -1)
-   {
-      $datbincue = "TRUE";
-   }
 }
-my @sorteddatfile = sort @linesdat;
+my @sorteddatfile = @linesdat;
 close (FILE);
 
 #read games directory contents
@@ -95,10 +89,6 @@ while (my $filename = readdir(DIR)) {
     next;
   } else {
     push(@linesgames, $filename) unless $filename eq '.' or $filename eq '..';
-	if (index(lc $filename, ".cue") != -1)
-	{
-       $bincue = "TRUE";
-	}
   }
 }
 closedir(DIR);
@@ -166,48 +156,43 @@ OUTER: foreach my $gameline (@linesgames)
       {
          if (index(lc $datline, "<rom name=") != -1)
          {
-	        if (($datbincue eq "TRUE" and index(lc $datline, ".bin") == -1) or $datbincue eq "FALSE")
-            {	  
-		       #parse rom name
-               $resultromstart = index($datline, '<rom name="');
-               $resultromend = index($datline, 'size="');
-               $extpos = rindex $datline, ".";  
-               $quotepos = rindex $datline, '"', $resultromend;
-               my $length = ($resultromend)  - ($resultromstart + 12);
-               $romname  = substr($datline, $resultromstart + 11, $length - ($quotepos - $extpos + 1));
-               $romname =~ s/amp;//g; #clean '&' in the dat file
+		    #parse rom name
+            $resultromstart = index($datline, '<rom name="');
+            $resultromend = index($datline, 'size="');
+            $extpos = rindex $datline, ".";  
+            $quotepos = rindex $datline, '"', $resultromend;
+            my $length = ($resultromend)  - ($resultromstart + 12);
+            $romname  = substr($datline, $resultromstart + 11, $length - ($quotepos - $extpos + 1));
+            $romname =~ s/amp;//g; #clean '&' in the dat file
          
-		       #parse crc
-		       $resultromstart = index($datline, 'crc="');
-		       $resultromend = index($datline, 'md5="');
-		       $length = ($resultromend)  - ($resultromstart + 6);
-		       $datcrc = substr($datline, $resultromstart + 5, $length - 1);
-		 		 
-		       #push (@sortedromenames, [$romname, $datcrc]);        
+		    #parse crc
+		    $resultromstart = index($datline, 'crc="');
+		    $resultromend = index($datline, 'md5="');
+		    $length = ($resultromend)  - ($resultromstart + 6);
+		    $datcrc = substr($datline, $resultromstart + 5, $length - 1);
 
-               #check for exact match between dat crc and file crc
-               if (uc $datcrc eq uc $filecrc)
-               {
-				  $match = 1;
-                  $totalmatches++;
-                  push(@linesmatch, [$gamename, $romname, $datcrc]);
-				  push(@alllinesout, ["MATCHED: ", "$gamename to $romname crc: $datcrc"]);
+            #check for exact match between dat crc and file crc
+            if (uc $datcrc eq uc $filecrc)
+            {
+               $match = 1;
+               $totalmatches++;
+               push(@linesmatch, [$gamename, $romname, $datcrc]);
+               push(@alllinesout, ["MATCHED: ", "$gamename to $romname crc: $datcrc"]);
 		    
-                  if ($renameall eq "TRUE")
+               if ($renameall eq "TRUE")
+               {
+	              if ($movefiles eq "TRUE")
                   {
-	                 if ($movefiles eq "TRUE")
-                     {
-                        rename($discdirectory . "/" . $gameline, $discdirectory . "/renamed/" . $romname . $fileext) || die ("Cannot rename: $gameline");
-                        push(@alllinesout, ["RENAMED & MOVED: ", "$gameline to $romname" . "$fileext"]);	 
-                     }
-                     elsif ($movefiles eq "FALSE")
-					 {
-                        rename($discdirectory . "/" . $gameline, $discdirectory . "/" . $romname . $fileext) || die ("Cannot rename: $gameline");
-                        push(@alllinesout, ["RENAMED: ", "$gameline to $romname" . "$fileext"]);
-                     }
+                     rename($discdirectory . "/" . $gameline, $discdirectory . "/renamed/" . $romname . $fileext) || die ("Cannot rename: $gameline");
+                     push(@alllinesout, ["RENAMED & MOVED: ", "$gameline to $romname" . "$fileext"]);	 
                   }
-                  next OUTER;
+                  elsif ($movefiles eq "FALSE")
+                  {
+                     rename($discdirectory . "/" . $gameline, $discdirectory . "/" . $romname . $fileext) || die ("Cannot rename: $gameline");
+                     push(@alllinesout, ["RENAMED: ", "$gameline to $romname" . "$fileext"]);
+                  }
                }
+               next OUTER;
             }
          }
       }
